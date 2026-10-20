@@ -31,3 +31,21 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Next.js dependencies and build files
+**/node_modules/
+**/.next/
+**/out/
+**/.turbo/
+
+# Logs and system files
+*.log
+.DS_Store
