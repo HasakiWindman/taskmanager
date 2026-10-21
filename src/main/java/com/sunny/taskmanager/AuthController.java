@@ -3,7 +3,10 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.CrossOrigin;
 
-@CrossOrigin(origins = "http://localhost:3000")
+@CrossOrigin(origins = {
+    "http://localhost:3000",
+    "https://taskmanager-puce-pi.vercel.app"
+})
 @RestController
 @RequestMapping("/auth")
 public class AuthController {

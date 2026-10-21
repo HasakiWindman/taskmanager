@@ -1,6 +1,9 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
 type Task = {
   id: number;
@@ -14,142 +17,211 @@ export default function Home() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [token, setToken] = useState<string | null>(null);
+  const [authLoaded, setAuthLoaded] = useState(false);
 
-async function register() {
-  const response = await fetch("http://localhost:8080/auth/register", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ email, password }),
-  });
+  // Register a new user
+  async function register() {
+    try {
+      const response = await fetch(`${API_URL}/auth/register`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
-  const message = await response.text();
-  alert(message);
-}
-
-async function login() {
-  const response = await fetch("http://localhost:8080/auth/login", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ email, password }),
-  });
-
-  const jwt = await response.text();
-
-  if (!response.ok || !jwt.startsWith("eyJ")) {
-    alert(jwt || "Login failed");
-    return;
+      const message = await response.text();
+      alert(message || (response.ok ? "Registered" : "Registration failed"));
+    } catch {
+      alert("Cannot connect to the backend");
+    }
   }
 
-  localStorage.setItem("token", jwt);
-  setToken(jwt);
+  // Log in and save JWT
+  async function login() {
+    try {
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
+      const jwt = await response.text();
 
+      if (!response.ok || !jwt.startsWith("eyJ")) {
+        alert(jwt || "Login failed");
+        return;
+      }
 
-}
-function logout() {
-  localStorage.removeItem("token");
-  setToken(null);
-  setTasks([]);
-}
+      localStorage.setItem("token", jwt);
+      setToken(jwt);
+      setPassword("");
+    } catch {
+      alert("Cannot connect to the backend");
+    }
+  }
 
-  function loadTasks() {
-  if (!token) return;
+  // Log out
+  function logout() {
+    localStorage.removeItem("token");
+    setToken(null);
+    setTasks([]);
+  }
 
-  fetch("http://localhost:8080/tasks", {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  })
-    .then((response) => response.json())
-    .then((data) => setTasks(data));
-}
+  // GET: Load tasks belonging to the logged-in user
+  async function loadTasks() {
+    if (!token) return;
+
+    try {
+      const response = await fetch(`${API_URL}/tasks`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.status === 401) {
+        logout();
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error("Failed to load tasks");
+      }
+
+      const data: Task[] = await response.json();
+      setTasks(data);
+    } catch (error) {
+      console.error("Failed to load tasks:", error);
+    }
+  }
+
+  // Restore JWT when the page refreshes
   useEffect(() => {
-  const savedToken = localStorage.getItem("token");
+    const savedToken = localStorage.getItem("token");
 
-  if (savedToken) {
-    setToken(savedToken);
-  }
+    if (savedToken) {
+      setToken(savedToken);
+    }
+
+    setAuthLoaded(true);
   }, []);
+
+  // Load tasks whenever the token changes
   useEffect(() => {
     if (token) {
       loadTasks();
     }
   }, [token]);
 
-  function addTask() {
-    if (!title.trim()) return;
+  // POST: Create a task
+  async function addTask() {
+    if (!title.trim() || !token) return;
 
-    fetch("http://localhost:8080/tasks", {
+    const response = await fetch(`${API_URL}/tasks`, {
       method: "POST",
       headers: {
-  "Content-Type": "application/json",
-  Authorization: `Bearer ${token}`,
-},
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
       body: JSON.stringify({
         title: title,
         completed: false,
       }),
-    }).then(() => {
+    });
+
+    if (response.ok) {
       setTitle("");
       loadTasks();
-    });
+    } else {
+      alert("Failed to add task");
+    }
   }
 
-  function completeTask(task: Task) {
-    fetch(`http://localhost:8080/tasks/${task.id}`, {
+  // PUT: Update a task
+  async function completeTask(task: Task) {
+    if (!token) return;
+
+    const response = await fetch(`${API_URL}/tasks/${task.id}`, {
       method: "PUT",
       headers: {
-  "Content-Type": "application/json",
-  Authorization: `Bearer ${token}`,
-},
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
       body: JSON.stringify({
         title: task.title,
         completed: !task.completed,
       }),
-    }).then(() => loadTasks());
+    });
+
+    if (response.ok) {
+      loadTasks();
+    } else {
+      alert("Failed to update task");
+    }
   }
 
-  function deleteTask(id: number) {
-    fetch(`http://localhost:8080/tasks/${id}`, {
-  method: "DELETE",
-  headers: {
-    Authorization: `Bearer ${token}`,
-  },
-}).then(() => loadTasks());
+  // DELETE: Delete a task
+  async function deleteTask(id: number) {
+    if (!token) return;
+
+    const response = await fetch(`${API_URL}/tasks/${id}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (response.ok) {
+      loadTasks();
+    } else {
+      alert("Failed to delete task");
+    }
   }
-if (!token) {
-  return (
-    <main className="page">
-      <div className="card">
-        <h1>Login</h1>
 
-        <input
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
+  // Wait until we check for a saved login
+  if (!authLoaded) {
+    return null;
+  }
 
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+  // Login and registration page
+  if (!token) {
+    return (
+      <main className="page">
+        <div className="card">
+          <h1>Login</h1>
 
-        <button onClick={login}>Login</button>
-        <button onClick={register}>Register</button>
-      </div>
-    </main>
-  );
-}
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") login();
+            }}
+          />
+
+          <button onClick={login}>Login</button>
+          <button onClick={register}>Register</button>
+        </div>
+      </main>
+    );
+  }
+
+  // Task Manager page
   return (
     <main className="page">
       <div className="card">
         <h1>Task Manager</h1>
+
         <button onClick={logout}>Logout</button>
 
         <div className="addRow">
