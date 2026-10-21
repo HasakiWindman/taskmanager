@@ -1,0 +1,33 @@
+name: Full-stack checks
+on:
+  push:
+    branches: [main, feature/portfolio-upgrade]
+  pull_request:
+    branches: [main]
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Test Spring Boot
+        run: ./mvnw test
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: taskmanager-frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: taskmanager-frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
