@@ -1,7 +1,9 @@
 package com.sunny.taskmanager;
-import org.springframework.web.bind.annotation.*;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.*;
 
 @CrossOrigin(origins = {
     "http://localhost:3000",
@@ -10,53 +12,43 @@ import org.springframework.web.bind.annotation.CrossOrigin;
 @RestController
 @RequestMapping("/auth")
 public class AuthController {
-    
-    private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
-    private JwtService jwtService;
+    private final UserRepository users;
+    private final PasswordEncoder encoder;
+    private final JwtService jwt;
 
-    public AuthController(
-            UserRepository userRepository,
-            PasswordEncoder passwordEncoder,
-            JwtService jwtService
-    ) {
-        this.userRepository = userRepository;
-        this.passwordEncoder = passwordEncoder;
-        this.jwtService = jwtService;
+    public AuthController(UserRepository users, PasswordEncoder encoder, JwtService jwt) {
+        this.users = users;
+        this.encoder = encoder;
+        this.jwt = jwt;
     }
 
     @PostMapping("/register")
-    public String register(@RequestBody User user) {
-
-        if (userRepository.findByEmail(user.getEmail()).isPresent()) {
-            return "Email already exists";
+    public ResponseEntity<String> register(@RequestBody User request) {
+        if (request.getEmail() == null || request.getEmail().isBlank()
+            || request.getPassword() == null || request.getPassword().length() < 6) {
+            return ResponseEntity.badRequest().body("Provide an email and a password of at least 6 characters");
         }
-        String hashedPassword =
-                passwordEncoder.encode(user.getPassword());
-
-        user.setPassword(hashedPassword);
-
-        userRepository.save(user);
-
-        return "User registered";
+        String email = request.getEmail().trim().toLowerCase();
+        if (!email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
+            return ResponseEntity.badRequest().body("Invalid email");
+        }
+        if (users.findByEmail(email).isPresent()) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body("Email already exists");
+        }
+        User user = new User(email, encoder.encode(request.getPassword()));
+        users.save(user);
+        return ResponseEntity.status(HttpStatus.CREATED).body("User registered");
     }
 
     @PostMapping("/login")
-public String login(@RequestBody User user) {
-
-    User savedUser = userRepository
-            .findByEmail(user.getEmail())
-            .orElse(null);
-
-    if (savedUser == null) {
-        return "User not found";
+    public ResponseEntity<String> login(@RequestBody User request) {
+        if (request.getEmail() == null || request.getPassword() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid credentials");
+        }
+        User user = users.findByEmail(request.getEmail().trim().toLowerCase()).orElse(null);
+        if (user == null || !encoder.matches(request.getPassword(), user.getPassword())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid credentials");
+        }
+        return ResponseEntity.ok(jwt.generateToken(user));
     }
-
-    if (!passwordEncoder.matches(user.getPassword(), savedUser.getPassword())) {
-
-        return "Wrong password";
-        
-    }
-    return jwtService.generateToken(savedUser);
-}
 }
