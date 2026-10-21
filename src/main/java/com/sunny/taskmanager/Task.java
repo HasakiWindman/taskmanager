@@ -15,7 +15,7 @@ public class Task {
     private boolean completed;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column
     private Priority priority = Priority.MEDIUM;
 
     private String category = "General";
