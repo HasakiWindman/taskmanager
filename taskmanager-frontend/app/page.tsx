@@ -33,8 +33,10 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    setToken(localStorage.getItem("token"));
-    setReady(true);
+    void Promise.resolve().then(() => {
+      setToken(localStorage.getItem("token"));
+      setReady(true);
+    });
   }, []);
 
   const loadTasks = useCallback(async () => {
@@ -51,7 +53,7 @@ export default function Home() {
     } finally { setLoading(false); }
   }, [token, logout]);
 
-  useEffect(() => { void loadTasks(); }, [loadTasks]);
+  useEffect(() => { void Promise.resolve().then(loadTasks); }, [loadTasks]);
 
   async function authenticate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
